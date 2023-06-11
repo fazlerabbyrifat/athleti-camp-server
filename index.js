@@ -31,6 +31,11 @@ async function run() {
     app.get('/classes', async(req, res) => {
         const result = await classesCollection.find().toArray();
         res.send(result);
+    });
+
+    app.get('/popular-classes', async(req, res) => {
+        const topClasses = await classesCollection.find().sort({totalStudents: -1}).limit(6).toArray();
+        res.send(topClasses);
     })
 
     // Connect the client to the server	(optional starting in v4.7)
