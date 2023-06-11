@@ -24,6 +24,15 @@ const client = new MongoClient(uri, {
 
 async function run() {
   try {
+
+    const classesCollection = client.db("athletiCamp").collection("classes");
+    const instructorsCollection = client.db("athletiCamp").collection("instructors");
+
+    app.get('/classes', async(req, res) => {
+        const result = await classesCollection.find().toArray();
+        res.send(result);
+    })
+
     // Connect the client to the server	(optional starting in v4.7)
     await client.connect();
     // Send a ping to confirm a successful connection
