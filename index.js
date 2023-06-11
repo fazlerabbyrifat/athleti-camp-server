@@ -29,13 +29,20 @@ async function run() {
     const instructorsCollection = client.db("athletiCamp").collection("instructors");
 
     app.get('/classes', async(req, res) => {
-        const result = await classesCollection.find().toArray();
-        res.send(result);
+        const classes = await classesCollection.find().toArray();
+        res.send(classes);
     });
 
+    // popular classes api
     app.get('/popular-classes', async(req, res) => {
         const topClasses = await classesCollection.find().sort({totalStudents: -1}).limit(6).toArray();
         res.send(topClasses);
+    })
+
+    // all instructors api
+    app.get('/instructors', async(req, res) => {
+        const instructors = await instructorsCollection.find().toArray();
+        res.send(instructors);
     })
 
     // Connect the client to the server	(optional starting in v4.7)
