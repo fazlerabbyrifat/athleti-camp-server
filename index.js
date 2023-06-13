@@ -27,6 +27,7 @@ async function run() {
 
     const classesCollection = client.db("athletiCamp").collection("classes");
     const instructorsCollection = client.db("athletiCamp").collection("instructors");
+    const usersCollection = client.db("athletiCamp").collection("users");
 
     app.get('/classes', async(req, res) => {
         const classes = await classesCollection.find().toArray();
@@ -49,6 +50,18 @@ async function run() {
     app.get('/popular-instructors', async(req, res) => {
         const popularInstructors = await instructorsCollection.find().sort({total_students: -1}).limit(6).toArray();
         res.send(popularInstructors);
+    })
+
+    // users collection
+    app.post('/users', async(req, res) => {
+      const user = req.body;
+      const query = {email: user.email};
+      const existingUser = await usersCollection.findOne(query);
+      if (existingUser) {
+        return res.send({message: "User already exists"});
+      }
+      const result = await usersCollection.insertOne(user);
+      res.send(result);
     })
 
     // Connect the client to the server	(optional starting in v4.7)
