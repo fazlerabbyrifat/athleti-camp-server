@@ -1,7 +1,7 @@
-const express = require('express');
-const cors = require('cors');
-require('dotenv').config();
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const express = require("express");
+const cors = require("cors");
+require("dotenv").config();
+const { MongoClient, ServerApiVersion } = require("mongodb");
 const app = express();
 const port = process.env.PORT || 5000;
 
@@ -19,61 +19,80 @@ const client = new MongoClient(uri, {
     version: ServerApiVersion.v1,
     strict: true,
     deprecationErrors: true,
-  }
+  },
 });
 
 async function run() {
   try {
-
     const classesCollection = client.db("athletiCamp").collection("classes");
-    const instructorsCollection = client.db("athletiCamp").collection("instructors");
+    const instructorsCollection = client
+      .db("athletiCamp")
+      .collection("instructors");
     const usersCollection = client.db("athletiCamp").collection("users");
 
-    app.get('/classes', async(req, res) => {
-        const classes = await classesCollection.find().toArray();
-        res.send(classes);
+    app.post("/jwt", (req, res) => {
+      const user = req.body;
+      const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
+        expiresIn: "1h",
+      });
+      res.send({ token });
+    });
+
+    app.get("/classes", async (req, res) => {
+      const classes = await classesCollection.find().toArray();
+      res.send(classes);
     });
 
     // popular classes api
-    app.get('/popular-classes', async(req, res) => {
-        const topClasses = await classesCollection.find().sort({totalStudents: -1}).limit(6).toArray();
-        res.send(topClasses);
-    })
+    app.get("/popular-classes", async (req, res) => {
+      const topClasses = await classesCollection
+        .find()
+        .sort({ totalStudents: -1 })
+        .limit(6)
+        .toArray();
+      res.send(topClasses);
+    });
 
     // all instructors api
-    app.get('/instructors', async(req, res) => {
-        const instructors = await instructorsCollection.find().toArray();
-        res.send(instructors);
-    })
+    app.get("/instructors", async (req, res) => {
+      const instructors = await instructorsCollection.find().toArray();
+      res.send(instructors);
+    });
 
     // popular instructors api
-    app.get('/popular-instructors', async(req, res) => {
-        const popularInstructors = await instructorsCollection.find().sort({total_students: -1}).limit(6).toArray();
-        res.send(popularInstructors);
-    })
+    app.get("/popular-instructors", async (req, res) => {
+      const popularInstructors = await instructorsCollection
+        .find()
+        .sort({ total_students: -1 })
+        .limit(6)
+        .toArray();
+      res.send(popularInstructors);
+    });
 
     // users collection
-    app.get('/users', async(req, res) => {
+    app.get("/users", async (req, res) => {
       const result = await usersCollection.find().toArray();
       res.send(result);
-    })
-    
-    app.post('/users', async(req, res) => {
+    });
+
+    app.post("/users", async (req, res) => {
       const user = req.body;
-      const query = {email: user.email};
+      const query = { email: user.email };
       const existingUser = await usersCollection.findOne(query);
       if (existingUser) {
-        return res.send({message: "User already exists"});
+        return res.send({ message: "User already exists" });
       }
       const result = await usersCollection.insertOne(user);
       res.send(result);
-    })
+    });
 
     // Connect the client to the server	(optional starting in v4.7)
     await client.connect();
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
-    console.log("Pinged your deployment. You successfully connected to MongoDB!");
+    console.log(
+      "Pinged your deployment. You successfully connected to MongoDB!"
+    );
   } finally {
     // Ensures that the client will close when you finish/error
     // await client.close();
@@ -81,11 +100,10 @@ async function run() {
 }
 run().catch(console.dir);
 
-
-app.get('/', (req, res) => {
-    res.send('Athleti camp is ongoing this season');
+app.get("/", (req, res) => {
+  res.send("Athleti camp is ongoing this season");
 });
 
 app.listen(port, () => {
-    console.log(`Athleti camp is ongoing this season on ${port}`);
+  console.log(`Athleti camp is ongoing this season on ${port}`);
 });
