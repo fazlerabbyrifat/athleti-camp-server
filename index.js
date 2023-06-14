@@ -1,6 +1,7 @@
 const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
+const jwt = require("jsonwebtoken");
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const app = express();
 const port = process.env.PORT || 5000;
@@ -48,6 +49,7 @@ async function run() {
       .db("athletiCamp")
       .collection("instructors");
     const usersCollection = client.db("athletiCamp").collection("users");
+    const selectedClassesCollection = client.db("athletiCamp").collection("selectedClasses");
 
     app.post("/jwt", (req, res) => {
       const user = req.body;
@@ -127,6 +129,25 @@ async function run() {
         },
       };
       const result = await usersCollection.updateOne(filter, updatedDoc);
+      res.send(result);
+    })
+
+    // selected classes api
+    app.get('/selectedClasses', verifyJWT, async(req, res) =>{
+      const result = await selectedClassesCollection.find().toArray();
+      res.send(result);
+    })
+
+    app.post('/selectedClasses', verifyJWT, async(req, res) => {
+      const selectedClasses = req.body;
+      const result = await selectedClassesCollection.insertOne(selectedClasses);
+      res.send(result);
+    })
+
+    app.delete('/selectedClass/:id', verifyJWT, async(req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await selectedClassesCollection.deleteOne(query);
       res.send(result);
     })
 
