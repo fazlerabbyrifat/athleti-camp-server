@@ -5,6 +5,7 @@ const jwt = require("jsonwebtoken");
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const app = express();
 const port = process.env.PORT || 5000;
+const stripe = require("stripe")(process.env.PAYMENT_SECRET_KEY)
 
 app.use(cors());
 app.use(express.json());
@@ -50,6 +51,7 @@ async function run() {
       .collection("instructors");
     const usersCollection = client.db("athletiCamp").collection("users");
     const selectedClassesCollection = client.db("athletiCamp").collection("selectedClasses");
+    const enrolledClassesCollection = client.db("athletiCamp").collection("enrolledClasses");
 
     app.post("/jwt", (req, res) => {
       const user = req.body;
@@ -144,12 +146,51 @@ async function run() {
       res.send(result);
     })
 
-    app.delete('/selectedClass/:id', verifyJWT, async(req, res) => {
+    app.delete('/selectedClasses/:id', verifyJWT, async(req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const result = await selectedClassesCollection.deleteOne(query);
       res.send(result);
     })
+
+    // payment 
+    app.post("/dashboard/payment/:id", verifyJWT, async (req, res) => {
+      const classId = (req.params.id);
+      const { paymentMethodId, paymentAmount } = req.body;
+      const query = { _id: new ObjectId(classId)};
+    
+      try {
+        const paymentIntent = await stripe.paymentIntents.create({
+          amount: paymentAmount * 100,
+          currency: "usd",
+          payment_method: paymentMethodId,
+          confirm: true,
+        });
+    
+        
+        if (paymentIntent.status === "succeeded") {
+          const remainingClass = await classesCollection.findOne(query);
+          console.log(remainingClass);
+          const updatedSeats = remainingClass?.availableSeats - 1;
+          await classesCollection.updateOne(
+            query,
+            { $set: { availableSeats: updatedSeats } }
+          );
+    
+          
+          const selectedClass = await selectedClassesCollection.findOne({_id: classId});
+          await enrolledClassesCollection.insertOne(selectedClass);
+          await selectedClassesCollection.deleteOne({_id: classId});
+    
+          res.status(200).send({ message: "Payment successful" });
+        } else {
+          res.status(400).send({ message: "Payment failed" });
+        }
+      } catch (error) {
+        console.log(error);
+        res.status(500).send({ message: "An error occurred during payment processing" });
+      }
+    });
 
     // Connect the client to the server	(optional starting in v4.7)
     await client.connect();
