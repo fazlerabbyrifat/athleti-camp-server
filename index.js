@@ -118,7 +118,7 @@ async function run() {
     });
 
     // users collection api
-    app.get("/users", async (req, res) => {
+    app.get("/users", verifyJWT, verifyUser, async (req, res) => {
       const result = await usersCollection.find().toArray();
       res.send(result);
     });
@@ -147,14 +147,23 @@ async function run() {
       res.send(result);
     });
 
-    app.get("/users/instructor/:email", verifyJWT, async (req, res) => {
-      const email = req.params.email;
+    app.get(
+      "/users/instructor/:email",
+      verifyJWT,
+      verifyUser,
+      async (req, res) => {
+        const email = req.params.email;
 
-      const query = { email: email };
-      const user = await usersCollection.findOne(query);
-      const result = { instructor: user?.role === "instructor" };
-      res.send(result);
-    });
+        if (req.decoded.email !== email) {
+          res.send({ instructor: false });
+        }
+
+        const query = { email: email };
+        const user = await usersCollection.findOne(query);
+        const result = { instructor: user?.role === "instructor" };
+        res.send(result);
+      }
+    );
 
     app.patch("/users/admin/:id", async (req, res) => {
       const id = req.params.id;
@@ -267,45 +276,50 @@ async function run() {
     });
 
     // Add a classes api
-    app.post("/addClass", verifyJWT, async (req, res) => {
+    app.post("/addClass", verifyJWT, verifyUser, async (req, res) => {
       const classData = req.body;
       const result = await addClassesCollection.insertOne(classData);
       res.send(result);
     });
 
-    app.get("/myClasses", async (req, res) => {
+    app.get("/myClasses", verifyJWT, verifyUser, async (req, res) => {
       const result = await addClassesCollection.find().toArray();
       res.send(result);
     });
 
     // manage class related api
-    app.get("/manageClasses", async (req, res) => {
+    app.get("/manageClasses", verifyJWT, verifyUser, async (req, res) => {
       const result = await addClassesCollection.find().toArray();
       res.send(result);
     });
 
-    app.put("/manageClasses/:id/role", async (req, res) => {
-      const id = req.params.id;
-      const { status } = req.body;
-      const filter = { _id: new ObjectId(id) };
-      const updatedDoc = {
-        $set: {
-          status,
-        },
-      };
-      const result = await addClassesCollection.updateOne(filter, updatedDoc);
-      if (status === "approved") {
-        const classData = await addClassesCollection.findOne(filter);
-        if (classData) {
-          const insertResult = await classesCollection.insertOne(classData);
-          console.log(
-            "Class moved to classesCollection:",
-            insertResult.insertedId
-          );
+    app.put(
+      "/manageClasses/:id/role",
+      verifyJWT,
+      verifyUser,
+      async (req, res) => {
+        const id = req.params.id;
+        const { status } = req.body;
+        const filter = { _id: new ObjectId(id) };
+        const updatedDoc = {
+          $set: {
+            status,
+          },
+        };
+        const result = await addClassesCollection.updateOne(filter, updatedDoc);
+        if (status === "approved") {
+          const classData = await addClassesCollection.findOne(filter);
+          if (classData) {
+            const insertResult = await classesCollection.insertOne(classData);
+            console.log(
+              "Class moved to classesCollection:",
+              insertResult.insertedId
+            );
+          }
         }
+        res.send(result);
       }
-      res.send(result);
-    });
+    );
 
     // Connect the client to the server	(optional starting in v4.7)
     await client.connect();
