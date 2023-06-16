@@ -66,6 +66,16 @@ async function run() {
       res.send({ token });
     });
 
+    const verifyAdmin = async (req, res, next) => {
+      const email = req.decoded.email;
+      const query = {email: email};
+      const user = await usersCollection.findOne(query);
+      if(user?.role !== 'admin') {
+        return res.status(403).send({ error: true, message: "Forbidden message"});
+      }
+      next();
+    }
+
     app.get("/classes", async (req, res) => {
       const classes = await classesCollection.find().toArray();
       res.send(classes);
