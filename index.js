@@ -49,6 +49,9 @@ async function run() {
     const instructorsCollection = client
       .db("athletiCamp")
       .collection("instructors");
+    const addClassesCollection = client
+      .db("athletiCamp")
+      .collection("addClass");
     const usersCollection = client.db("athletiCamp").collection("users");
     const selectedClassesCollection = client
       .db("athletiCamp")
@@ -66,15 +69,22 @@ async function run() {
       res.send({ token });
     });
 
-    const verifyAdmin = async (req, res, next) => {
+    const verifyUser = async (req, res, next) => {
       const email = req.decoded.email;
-      const query = {email: email};
+      const query = { email: email };
       const user = await usersCollection.findOne(query);
-      if(user?.role !== 'admin') {
-        return res.status(403).send({ error: true, message: "Forbidden message"});
+      if (user?.role !== "admin") {
+        const instructorQuery = {
+          email: email,
+          role: "instructor",
+        };
+        const instructor = await usersCollection.findOne(instructorQuery);
+        if (!instructor) {
+          res.status(403).send({ error: true, message: "Forbidden message" });
+        }
       }
       next();
-    }
+    };
 
     app.get("/classes", async (req, res) => {
       const classes = await classesCollection.find().toArray();
@@ -124,7 +134,7 @@ async function run() {
       res.send(result);
     });
 
-    app.get("/users/admin/:email", verifyJWT, verifyAdmin, async (req, res) => {
+    app.get("/users/admin/:email", verifyJWT, verifyUser, async (req, res) => {
       const email = req.params.email;
 
       if (req.decoded.email !== email) {
@@ -137,12 +147,22 @@ async function run() {
       res.send(result);
     });
 
+    app.get("/users/instructor/:email", verifyJWT, async (req, res) => {
+      const email = req.params.email;
+
+      const query = { email: email };
+      const user = await usersCollection.findOne(query);
+      const result = { instructor: user?.role === "instructor" };
+      res.send(result);
+    });
+
     app.patch("/users/admin/:id", async (req, res) => {
       const id = req.params.id;
+      const newRole = req.body.role;
       const filter = { _id: new ObjectId(id) };
       const updatedDoc = {
         $set: {
-          role: "admin",
+          role: newRole,
         },
       };
       const result = await usersCollection.updateOne(filter, updatedDoc);
@@ -174,7 +194,7 @@ async function run() {
       const classId = req.params.id;
       const { paymentMethodId, paymentAmount } = req.body;
       const query = { _id: new ObjectId(classId) };
-    
+
       try {
         const paymentIntent = await stripe.paymentIntents.create({
           amount: paymentAmount * 100,
@@ -182,12 +202,12 @@ async function run() {
           payment_method: paymentMethodId,
           confirm: true,
         });
-    
+
         if (paymentIntent.status === "succeeded") {
           const selectedClass = await selectedClassesCollection.findOne({
             _id: classId,
           });
-    
+
           const enrolledClass = {
             _id: selectedClass._id,
             image: selectedClass.image,
@@ -197,30 +217,30 @@ async function run() {
             remainingSeats: parseInt(selectedClass.remainingSeats),
             price: selectedClass.price,
           };
-    
+
           await enrolledClassesCollection.insertOne(enrolledClass);
           await selectedClassesCollection.deleteOne({ _id: classId });
-    
+
           const remainingClass = await classesCollection.findOne(query);
           const updatedRemainingSeats = remainingClass?.availableSeats - 1;
           const updateTotalStudents = remainingClass?.totalStudents + 1;
-    
+
           await classesCollection.updateOne(query, {
             $set: {
               availableSeats: updatedRemainingSeats,
               totalStudents: updateTotalStudents,
             },
           });
-    
+
           const paymentData = {
             classId: classId,
             paymentMethodId: paymentMethodId,
             paymentAmount: paymentAmount,
             date: new Date(),
           };
-    
+
           const result = await paymentCollection.insertOne(paymentData);
-    
+
           res.status(200).send({ message: "Payment successful", result });
         } else {
           res.status(400).send({ message: "Payment failed" });
@@ -233,15 +253,59 @@ async function run() {
       }
     });
 
-    app.get('/payment', async(req, res) => {
-      const result = await paymentCollection.find().sort({ date: -1 }).toArray();
+    app.get("/payment", async (req, res) => {
+      const result = await paymentCollection
+        .find()
+        .sort({ date: -1 })
+        .toArray();
       res.send(result);
-    })
+    });
 
-    app.get('/enrolledClasses', async(req, res) => {
+    app.get("/enrolledClasses", async (req, res) => {
       const result = await enrolledClassesCollection.find().toArray();
       res.send(result);
-    })
+    });
+
+    // Add a classes api
+    app.post("/addClass", verifyJWT, async (req, res) => {
+      const classData = req.body;
+      const result = await addClassesCollection.insertOne(classData);
+      res.send(result);
+    });
+
+    app.get("/myClasses", async (req, res) => {
+      const result = await addClassesCollection.find().toArray();
+      res.send(result);
+    });
+
+    // manage class related api
+    app.get("/manageClasses", async (req, res) => {
+      const result = await addClassesCollection.find().toArray();
+      res.send(result);
+    });
+
+    app.put("/manageClasses/:id/role", async (req, res) => {
+      const id = req.params.id;
+      const { status } = req.body;
+      const filter = { _id: new ObjectId(id) };
+      const updatedDoc = {
+        $set: {
+          status,
+        },
+      };
+      const result = await addClassesCollection.updateOne(filter, updatedDoc);
+      if (status === "approved") {
+        const classData = await addClassesCollection.findOne(filter);
+        if (classData) {
+          const insertResult = await classesCollection.insertOne(classData);
+          console.log(
+            "Class moved to classesCollection:",
+            insertResult.insertedId
+          );
+        }
+      }
+      res.send(result);
+    });
 
     // Connect the client to the server	(optional starting in v4.7)
     await client.connect();
