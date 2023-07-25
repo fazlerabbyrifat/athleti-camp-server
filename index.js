@@ -118,7 +118,7 @@ async function run() {
     });
 
     // users collection api
-    app.get("/users", verifyJWT, verifyUser, async (req, res) => {
+    app.get("/users", verifyJWT, async (req, res) => {
       const result = await usersCollection.find().toArray();
       res.send(result);
     });
@@ -184,8 +184,20 @@ async function run() {
       res.send(result);
     });
 
-    app.post("/selectedClasses", verifyJWT, async (req, res) => {
+    app.post("/selectedClasses", async (req, res) => {
       const selectedClasses = req.body;
+    //   const query = {
+    //     $and: [
+    //         { classId: selectedClasses.classId },
+    //         { email: selectedClasses.email }
+    //     ]
+    // }
+
+    // const isExist = await selectedCollection.findOne(query)
+
+    // if (isExist) {
+    //     return res.send({ message: 'exists' })
+    // }
       const result = await selectedClassesCollection.insertOne(selectedClasses);
       res.send(result);
     });
@@ -282,44 +294,39 @@ async function run() {
       res.send(result);
     });
 
-    app.get("/myClasses", verifyJWT, verifyUser, async (req, res) => {
+    app.get("/myClasses", verifyJWT, async (req, res) => {
       const result = await addClassesCollection.find().toArray();
       res.send(result);
     });
 
     // manage class related api
-    app.get("/manageClasses", verifyJWT, verifyUser, async (req, res) => {
+    app.get("/manageClasses", verifyJWT, async (req, res) => {
       const result = await addClassesCollection.find().toArray();
       res.send(result);
     });
 
-    app.put(
-      "/manageClasses/:id/role",
-      verifyJWT,
-      verifyUser,
-      async (req, res) => {
-        const id = req.params.id;
-        const { status } = req.body;
-        const filter = { _id: new ObjectId(id) };
-        const updatedDoc = {
-          $set: {
-            status,
-          },
-        };
-        const result = await addClassesCollection.updateOne(filter, updatedDoc);
-        if (status === "approved") {
-          const classData = await addClassesCollection.findOne(filter);
-          if (classData) {
-            const insertResult = await classesCollection.insertOne(classData);
-            console.log(
-              "Class moved to classesCollection:",
-              insertResult.insertedId
-            );
-          }
+    app.put("/manageClasses/:id/role", verifyJWT, async (req, res) => {
+      const id = req.params.id;
+      const { status } = req.body;
+      const filter = { _id: new ObjectId(id) };
+      const updatedDoc = {
+        $set: {
+          status,
+        },
+      };
+      const result = await addClassesCollection.updateOne(filter, updatedDoc);
+      if (status === "approved") {
+        const classData = await addClassesCollection.findOne(filter);
+        if (classData) {
+          const insertResult = await classesCollection.insertOne(classData);
+          console.log(
+            "Class moved to classesCollection:",
+            insertResult.insertedId
+          );
         }
-        res.send(result);
       }
-    );
+      res.send(result);
+    });
 
     // Connect the client to the server	(optional starting in v4.7)
     await client.connect();
