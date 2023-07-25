@@ -202,7 +202,7 @@ async function run() {
       res.send(result);
     });
 
-    app.delete("/selectedClasses/:id", verifyJWT, async (req, res) => {
+    app.delete("/selectedClasses/:id", async (req, res) => {
       const id = req.params.id;
       console.log(id);
       const query = { _id: id };
